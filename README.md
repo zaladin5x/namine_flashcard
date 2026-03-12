@@ -1,0 +1,1 @@
+# namine_flashcard
