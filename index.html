@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Namine - Flash Card JP</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700;900&family=Shippori+Mincho:wght@400;700&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0c;--s1:#131315;--s2:#1a1a1d;--s3:#222226;--border:rgba(255,255,255,0.06);--text:#ede9e3;--muted:rgba(237,233,227,0.36);--accent:#c9aa7c;--blue:#7eb8d4;--green:#5db88a;--red:#d95f5f;--orange:#d4834a}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Sarabun','Noto Sans JP',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+nav{padding:16px 22px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;background:rgba(10,10,12,0.95);backdrop-filter:blur(14px)}
+.nb{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--s2);color:var(--text);font-size:14px;cursor:pointer;display:none;align-items:center;justify-content:center;transition:.2s}
+.nb:hover{background:var(--s3)}
+.nt{font-family:'Shippori Mincho',serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--accent)}
+.ns{font-size:12px;color:var(--muted);margin-left:auto;display:flex;align-items:center;gap:10px}
+.streak-b{display:flex;align-items:center;gap:4px;background:rgba(201,170,124,0.1);border:1px solid rgba(201,170,124,0.2);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--accent)}
+#app{flex:1;padding:28px 20px;max-width:600px;margin:0 auto;width:100%}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:14px;color:var(--muted);font-size:14px}
+.spinner{width:30px;height:30px;border:2px solid var(--s3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{background:rgba(217,95,95,.08);border:1px solid rgba(217,95,95,.22);border-radius:14px;padding:22px;font-size:14px;line-height:1.9;color:#e8a0a0}
+.err code{background:rgba(255,255,255,.06);padding:1px 7px;border-radius:4px;color:var(--accent)}
+.slabel{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-family:'Shippori Mincho',serif;margin-bottom:12px}
+
+/* Today banner */
+.today-banner{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.today-count{font-size:32px;font-weight:900;color:var(--accent);line-height:1}
+.today-title{font-size:12px;color:var(--muted);margin-bottom:6px}
+.today-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.review-all-btn{padding:12px 22px;background:var(--accent);color:#0a0a0c;border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.2s;white-space:nowrap;flex-shrink:0}
+.review-all-btn:hover{filter:brightness(1.1);transform:scale(1.03)}
+.review-all-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+
+/* Stats */
+.stats-row{display:flex;gap:8px;margin-bottom:22px}
+.stat-box{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:13px 14px;text-align:center}
+.stat-n{font-size:20px;font-weight:900}
+.stat-l{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* Deck list */
+.deck-list{display:flex;flex-direction:column;gap:8px}
+.deck-card{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:border-color .2s,background .2s,transform .2s;color:var(--text);font-family:inherit;text-align:left}
+.deck-card:hover{border-color:var(--accent);background:var(--s2);transform:translateX(3px)}
+.dk-name{font-size:15px;font-weight:700}
+.dk-meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap}
+.dk-chip{padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.chip-due{background:rgba(217,95,95,.15);color:var(--red)}
+.chip-new{background:rgba(126,184,212,.12);color:var(--blue)}
+.chip-ok{background:rgba(93,184,138,.1);color:var(--green)}
+.dk-right{display:flex;align-items:center;gap:10px}
+.ring-wrap{position:relative;width:38px;height:38px}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-t{fill:none;stroke:var(--s3);stroke-width:3}
+.ring-f{fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .5s}
+.ring-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+
+/* Review */
+.rev-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.rh-l{font-size:13px;color:var(--muted)}
+.rh-r{display:flex;gap:6px}
+.rh-chip{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.rh-due{background:rgba(217,95,95,.12);color:var(--red)}
+.rh-new{background:rgba(126,184,212,.1);color:var(--blue)}
+.prog-track{height:2px;background:var(--s2);border-radius:2px;margin-bottom:26px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease}
+
+.flashcard{background:var(--s1);border:1px solid var(--border);border-radius:22px;padding:42px 26px;min-height:228px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;transition:border-color .3s}
+.flashcard.shown{border-color:rgba(201,170,124,.18)}
+.fc-label{position:absolute;top:14px;left:17px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'Shippori Mincho',serif}
+.fc-badge{position:absolute;top:12px;right:14px;font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700}
+.badge-new{background:rgba(126,184,212,.15);color:var(--blue)}
+.badge-due{background:rgba(217,95,95,.15);color:var(--red)}
+.badge-ok{background:rgba(93,184,138,.1);color:var(--green)}
+.fc-q{font-family:'Noto Sans JP',serif;font-size:56px;font-weight:900;line-height:1}
+.fc-q.sm{font-size:24px}
+.fc-div{width:36px;height:1px;background:var(--border);margin:16px auto;transition:width .4s,background .4s}
+.fc-div.show{width:60px;background:var(--accent)}
+.fc-r{font-family:'Noto Sans JP',sans-serif;font-size:23px;font-weight:300;color:var(--blue);opacity:0;transform:translateY(7px);transition:opacity .3s,transform .3s;min-height:30px}
+.fc-r.show{opacity:1;transform:translateY(0)}
+.fc-m{font-size:16px;color:var(--muted);margin-top:6px;opacity:0;transform:translateY(7px);transition:opacity .3s .08s,transform .3s .08s;min-height:24px}
+.fc-m.show{opacity:1;transform:translateY(0)}
+.fc-ivl{margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;opacity:0;transition:opacity .3s .14s;min-height:18px}
+.fc-ivl.show{opacity:1}
+.ivl-hint{font-size:10px}
+
+.show-btn{margin-top:22px;width:100%;padding:15px;background:var(--s2);border:1px solid var(--border);border-radius:13px;color:var(--text);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:.2s}
+.show-btn:hover:not(:disabled){background:var(--s3);border-color:rgba(255,255,255,.12)}
+.show-btn.done{opacity:.25;cursor:default;font-size:12px}
+
+/* Grade */
+.grade-row{display:flex;gap:7px;margin-top:9px}
+.grade-btn{flex:1;padding:12px 4px;border-radius:12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;border:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:2px}
+.gl{font-size:9px;font-weight:400;opacity:.65;margin-top:1px}
+.gb-a{background:rgba(217,95,95,.1);border-color:rgba(217,95,95,.25);color:var(--red)}
+.gb-a:hover:not(:disabled){background:rgba(217,95,95,.22);border-color:var(--red);transform:scale(1.03)}
+.gb-h{background:rgba(212,131,74,.1);border-color:rgba(212,131,74,.25);color:var(--orange)}
+.gb-h:hover:not(:disabled){background:rgba(212,131,74,.22);border-color:var(--orange);transform:scale(1.03)}
+.gb-g{background:rgba(93,184,138,.1);border-color:rgba(93,184,138,.25);color:var(--green)}
+.gb-g:hover:not(:disabled){background:rgba(93,184,138,.22);border-color:var(--green);transform:scale(1.03)}
+.gb-e{background:rgba(126,184,212,.1);border-color:rgba(126,184,212,.25);color:var(--blue)}
+.gb-e:hover:not(:disabled){background:rgba(126,184,212,.2);border-color:var(--blue);transform:scale(1.03)}
+.grade-btn:disabled{opacity:.2;cursor:not-allowed;transform:none!important}
+.grade-btn.sel{opacity:1!important;filter:brightness(1.4)}
+
+/* Done */
+.done-screen{text-align:center;padding:20px 0}
+.done-emoji{font-size:60px;margin-bottom:12px}
+.done-title{font-family:'Shippori Mincho',serif;font-size:22px;margin-bottom:6px}
+.done-sub{font-size:14px;color:var(--muted);margin-bottom:22px}
+.done-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:26px}
+.done-cell{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:12px 6px;text-align:center}
+.dn{font-size:22px;font-weight:900}
+.dl{font-size:10px;color:var(--muted);margin-top:2px}
+.dn.green{color:var(--green)}.dn.orange{color:var(--orange)}.dn.red{color:var(--red)}.dn.blue{color:var(--blue)}
+.done-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.done-btn{padding:12px 22px;border-radius:12px;border:1px solid rgba(201,170,124,.3);background:rgba(201,170,124,.07);color:var(--accent);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.2s}
+.done-btn:hover{background:rgba(201,170,124,.16);transform:scale(1.02)}
+.done-btn.sec{border-color:var(--border);color:var(--muted)}
+.done-btn.sec:hover{background:var(--s2)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--s2);border-radius:4px}
+</style>
+</head>
+<body>
+<nav>
+  <button class="nb" id="nb" onclick="goHome()">←</button>
+  <div><div class="nt">Namine - Flash Card</div></div>
+  <div class="ns">
+    <div class="streak-b" id="streakB">🔥 0</div>
+    <span id="ns"></span>
+  </div>
+</nav>
+<div id="app"></div>
+
+<script>
+/* ── CONFIG ── */
+const TXT_FILE    = 'cards.txt';
+const NEW_PER_DAY = 10;
+
+/* ── DATE ── */
+function today()      { return new Date().toISOString().slice(0,10); }
+function addDays(d,n) { const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); }
+
+/* ── SM-2 ── */
+function applyGrade(card, g) {
+  const c={...card};
+  if(!c.ease)    c.ease=2.5;
+  if(!c.interval)c.interval=0;
+  if(!c.reps)    c.reps=0;
+  if(!c.lapses)  c.lapses=0;
+  if(g===0){
+    c.lapses++; c.reps=0; c.interval=1;
+    c.ease=Math.max(1.3,c.ease-0.2);
+  } else {
+    c.reps++;
+    if(c.reps===1)      c.interval=1;
+    else if(c.reps===2) c.interval=(g===3?4:3);
+    else {
+      if(g===1)      {c.interval=Math.round(c.interval*1.2);c.ease=Math.max(1.3,c.ease-0.15);}
+      else if(g===2) {c.interval=Math.round(c.interval*c.ease);}
+      else           {c.interval=Math.round(c.interval*c.ease*1.3);c.ease=Math.min(4,c.ease+0.15);}
+    }
+    c.interval=Math.max(1,c.interval);
+  }
+  c.due=addDays(today(),c.interval);
+  return c;
+}
+
+function ivlLabel(card,g){
+  const d=applyGrade(card,g).interval;
+  if(d===1)return '1 day';
+  if(d<30) return d+' days';
+  return Math.round(d/30)+'mo';
+}
+
+/* ── STORAGE ── */
+function loadSRS(){try{return JSON.parse(localStorage.getItem('fc_srs')||'{}');}catch{return{};}}
+function saveSRS(d){localStorage.setItem('fc_srs',JSON.stringify(d));}
+function getCard(srs,uid){return srs[uid]||{reps:0,interval:0,ease:2.5,lapses:0,due:null};}
+
+function getStreak(){const s=loadSRS();return s.__streak||{count:0,lastDate:''};}
+function updateStreak(){
+  const s=loadSRS();
+  const st=s.__streak||{count:0,lastDate:''};
+  const t=today();
+  if(st.lastDate===t)return st.count;
+  if(st.lastDate===addDays(t,-1))st.count++;else st.count=1;
+  st.lastDate=t; s.__streak=st; saveSRS(s);
+  return st.count;
+}
+
+/* ── STATE ── */
+let CATEGORIES=[], screen='loading', activeCat=null;
+let queue=[], qi=0, shown=false, sessionLog=[];
+
+/* ── QUEUE ── */
+function buildQueue(cat){
+  const srs=loadSRS(), t=today();
+  let due=[],newC=[];
+  const cats=cat?[cat]:CATEGORIES;
+  cats.forEach(c=>c.cards.forEach(card=>{
+    const uid=c.id+':'+card.key, sc=getCard(srs,uid);
+    if(!sc.due) newC.push({card,uid,isNew:true,sc});
+    else if(sc.due<=t) due.push({card,uid,isNew:false,sc});
+  }));
+  return [...shuffle(due),...shuffle(newC).slice(0,NEW_PER_DAY)];
+}
+
+function getDeckInfo(cat){
+  const srs=loadSRS(), t=today();
+  let due=0,newC=0,learned=0;
+  cat.cards.forEach(card=>{
+    const sc=getCard(srs,cat.id+':'+card.key);
+    if(!sc.due)newC++;else if(sc.due<=t)due++;else learned++;
+  });
+  const pct=cat.cards.length?Math.round(learned/cat.cards.length*100):0;
+  return{due,new:newC,learned,total:cat.cards.length,pct};
+}
+
+function getTodayTotal(){
+  const srs=loadSRS(),t=today();
+  let due=0,newC=0;
+  CATEGORIES.forEach(c=>c.cards.forEach(card=>{
+    const sc=getCard(srs,c.id+':'+card.key);
+    if(!sc.due)newC++;else if(sc.due<=t)due++;
+  }));
+  return{due,new:Math.min(newC,NEW_PER_DAY)};
+}
+
+/* ── GAME ── */
+function startReview(cat){
+  activeCat=cat||null;
+  queue=buildQueue(cat); qi=0; shown=false; sessionLog=[];
+  if(!queue.length){goHome();return;}
+  screen='review'; render();
+}
+
+function goHome(){screen='home';activeCat=null;render();}
+
+function showAnswer(){
+  shown=true;
+  document.querySelector('.fc-r')?.classList.add('show');
+  document.querySelector('.fc-m')?.classList.add('show');
+  document.querySelector('.fc-div')?.classList.add('show');
+  document.querySelector('.flashcard')?.classList.add('shown');
+  document.querySelector('.fc-ivl')?.classList.add('show');
+  const btn=document.querySelector('.show-btn');
+  if(btn){btn.textContent='ดูเฉลยแล้ว';btn.classList.add('done');btn.disabled=true;}
+  document.querySelectorAll('.grade-btn').forEach(b=>b.disabled=false);
+}
+
+function grade(g){
+  const item=queue[qi];
+  const srs=loadSRS();
+  const nc=applyGrade(item.sc,g);
+  srs[item.uid]=nc; saveSRS(srs);
+  sessionLog.push({grade:g,isNew:item.isNew});
+  document.querySelectorAll('.grade-btn').forEach(b=>b.disabled=true);
+  document.querySelectorAll('.grade-btn')[g]?.classList.add('sel');
+  if(g===0) queue.push({...item,sc:nc}); // Again → re-queue
+  setTimeout(()=>{
+    qi++;
+    if(qi>=queue.length){updateStreak();screen='done';render();}
+    else{shown=false;render();}
+  },350);
+}
+
+/* ── UTILS ── */
+function shuffle(a){const r=[...a];for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];}return r;}
+
+/* ── FETCH ── */
+async function loadCards(){
+  try{
+    const res=await fetch(TXT_FILE+'?v='+Date.now());
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    CATEGORIES=parseTxt(await res.text());
+    if(!CATEGORIES.length) throw new Error('ไม่พบข้อมูลในไฟล์');
+    screen='home';
+  }catch(e){screen='error';window._err=e.message;}
+  render();
+}
+
+function parseTxt(text){
+  const lines=text.split(/\r?\n/),cats=[];let cur=null;
+  for(const raw of lines){
+    const line=raw.trim();
+    if(!line||line.startsWith('#'))continue;
+    if(line.startsWith('[')){cur={id:'cat_'+cats.length,name:line.slice(1,-1).trim(),cards:[]};cats.push(cur);}
+    else if(cur){
+      const p=line.split('|');
+      if(p.length>=2){const card={q:p[0].trim(),r:p[1].trim(),m:p[2]?p[2].trim():''};card.key=card.q;cur.cards.push(card);}
+    }
+  }
+  return cats.filter(c=>c.cards.length>0);
+}
+
+/* ── RENDER ── */
+function render(){
+  const app=document.getElementById('app'),nb=document.getElementById('nb'),ns=document.getElementById('ns');
+  document.getElementById('streakB').textContent='🔥 '+getStreak().count;
+  nb.style.display=['home','loading','error'].includes(screen)?'none':'flex';
+
+  if(screen==='loading'){ns.textContent='';app.innerHTML=`<div class="loading"><div class="spinner"></div>Loading...</div>`;}
+  else if(screen==='error'){ns.textContent='';app.innerHTML=`<div class="err">⚠️ Failed to load<br><br>${window._err}<br><br>Make sure <code>${TXT_FILE}</code> is in the same folder as <code>index.html</code></div>`;}
+  else if(screen==='home'){ns.textContent='';app.innerHTML=renderHome();}
+  else if(screen==='review'){
+    ns.textContent=activeCat?activeCat.name:'Today\'s Review';
+    app.innerHTML=renderReview();
+    if(shown){
+      document.querySelector('.fc-r')?.classList.add('show');
+      document.querySelector('.fc-m')?.classList.add('show');
+      document.querySelector('.fc-div')?.classList.add('show');
+      document.querySelector('.flashcard')?.classList.add('shown');
+      document.querySelector('.fc-ivl')?.classList.add('show');
+    }
+  }
+  else if(screen==='done'){ns.textContent='';app.innerHTML=renderDone();}
+}
+
+function renderHome(){
+  const tot=getTodayTotal(), totalDue=tot.due+tot.new;
+  let allLearned=0,allTotal=0;
+  CATEGORIES.forEach(c=>{const i=getDeckInfo(c);allLearned+=i.learned;allTotal+=c.cards.length;});
+  const gPct=allTotal?Math.round(allLearned/allTotal*100):0;
+
+  const decks=CATEGORIES.map(c=>{
+    const info=getDeckInfo(c);
+    const r=16,circ=2*Math.PI*r,offset=circ-(info.pct/100)*circ;
+    const col=info.pct>=70?'var(--green)':info.pct>=40?'var(--accent)':info.learned?'var(--red)':'var(--muted)';
+    const chips=[
+      info.due?`<span class="dk-chip chip-due">${info.due} due`:'',
+      info.new?`<span class="dk-chip chip-new">${info.new} new</span>`:'',
+      (!info.due&&!info.new)?`<span class="dk-chip chip-ok">✓ done</span>`:'',
+    ].join('');
+    return `<button class="deck-card" onclick="startReview(CATEGORIES.find(x=>x.id==='${c.id}'))">
+      <div><div class="dk-name">${c.name}</div><div class="dk-meta">${c.cards.length} cards &nbsp;${chips}</div></div>
+      <div class="dk-right">
+        <div class="ring-wrap"><svg width="38" height="38" viewBox="0 0 38 38">
+          <circle class="ring-t" cx="19" cy="19" r="${r}"/>
+          <circle class="ring-f" cx="19" cy="19" r="${r}" stroke="${col}" stroke-dasharray="${circ}" stroke-dashoffset="${info.learned?offset:circ}"/>
+        </svg><div class="ring-pct" style="color:${col}">${info.learned?info.pct+'%':'?'}</div></div>
+        <span style="font-size:16px;color:var(--accent);opacity:.5">›</span>
+      </div></button>`;
+  }).join('');
+
+  return `
+    <div class="today-banner">
+      <div><div class="today-title">Due Today</div><div class="today-count">${totalDue}</div><div class="today-sub">${tot.due} review · ${tot.new} new</div></div>
+      <button class="review-all-btn" onclick="startReview(null)" ${!totalDue?'disabled':''}>${totalDue?'Start Review →':'All done ✓'}</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-n" style="color:var(--accent)">${allTotal}</div><div class="stat-l">Total Cards</div></div>
+      <div class="stat-box"><div class="stat-n" style="color:var(--green)">${allLearned}</div><div class="stat-l">Learned</div></div>
+      <div class="stat-box"><div class="stat-n" style="color:var(--blue)">${gPct}%</div><div class="stat-l">Coverage</div></div>
+    </div>
+    <p class="slabel">Decks</p>
+    <div class="deck-list">${decks}</div>
+    <p style="margin-top:16px;font-size:11px;color:rgba(237,233,227,.14);text-align:center">Stats saved in browser · Add decks in cards.txt</p>`;
+}
+
+function renderReview(){
+  const item=queue[qi],card=item.card;
+  const remaining=queue.length-qi;
+  const dueLeft=queue.slice(qi).filter(x=>!x.isNew).length;
+  const newLeft=queue.slice(qi).filter(x=>x.isNew).length;
+  const pct=qi/queue.length*100;
+  const badgeCls=item.isNew?'badge-new':item.sc.lapses>0?'badge-due':'badge-ok';
+  const badgeTxt=item.isNew?'New':item.sc.lapses>0?'Relearn':'Review';
+  const isLong=card.q.length>4;
+
+  const ivlHints=shown?`
+    <span class="ivl-hint" style="color:var(--red)">Again ${ivlLabel(item.sc,0)}</span>
+    <span class="ivl-hint" style="color:var(--orange)">Hard ${ivlLabel(item.sc,1)}</span>
+    <span class="ivl-hint" style="color:var(--green)">Good ${ivlLabel(item.sc,2)}</span>
+    <span class="ivl-hint" style="color:var(--blue)">Easy ${ivlLabel(item.sc,3)}</span>`:
+    '';
+
+  return `
+    <div class="rev-hdr">
+      <span class="rh-l">${remaining} left</span>
+      <div class="rh-r">
+        ${dueLeft?`<span class="rh-chip rh-due">${dueLeft}</span>`:''}
+        ${newLeft?`<span class="rh-chip rh-new">${newLeft}</span>`:''}
+      </div>
+    </div>
+    <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
+    <div class="flashcard ${shown?'shown':''}">
+      <div class="fc-label">${activeCat?activeCat.name:'All'}</div>
+      <div class="fc-badge ${badgeCls}">${badgeTxt}</div>
+      <div class="fc-q ${isLong?'sm':''}">${card.q}</div>
+      <div class="fc-div ${shown?'show':''}"></div>
+      <div class="fc-r ${shown?'show':''}">${card.r}</div>
+      <div class="fc-m ${shown?'show':''}">${card.m}</div>
+      <div class="fc-ivl ${shown?'show':''}">${ivlHints}</div>
+    </div>
+    <button class="show-btn ${shown?'done':''}" onclick="showAnswer()" ${shown?'disabled':''}>
+      ${shown?'Answer shown':'👁 Show Answer'}
+    </button>
+    <div class="grade-row">
+      <button class="grade-btn gb-a" onclick="grade(0)" ${!shown?'disabled':''}>✗ Again<span class="gl">${shown?ivlLabel(item.sc,0):'-'}</span></button>
+      <button class="grade-btn gb-h" onclick="grade(1)" ${!shown?'disabled':''}>Hard<span class="gl">${shown?ivlLabel(item.sc,1):'-'}</span></button>
+      <button class="grade-btn gb-g" onclick="grade(2)" ${!shown?'disabled':''}>✓ Good<span class="gl">${shown?ivlLabel(item.sc,2):'-'}</span></button>
+      <button class="grade-btn gb-e" onclick="grade(3)" ${!shown?'disabled':''}>⚡ Easy<span class="gl">${shown?ivlLabel(item.sc,3):'-'}</span></button>
+    </div>`;
+}
+
+function renderDone(){
+  const total=sessionLog.length;
+  const again=sessionLog.filter(l=>l.grade===0).length;
+  const hard=sessionLog.filter(l=>l.grade===1).length;
+  const good=sessionLog.filter(l=>l.grade===2).length;
+  const easy=sessionLog.filter(l=>l.grade===3).length;
+  const streak=getStreak().count;
+  const pct=total?Math.round((good+easy)/total*100):0;
+  const emoji=pct>=80?'🏆':pct>=60?'👏':'📚';
+  const msg=pct>=80?'Excellent!':pct>=60?'Good job!':'Keep going!';
+  const tot2=getTodayTotal();
+
+  return `
+    <div class="done-screen">
+      <div class="done-emoji">${emoji}</div>
+      <div class="done-title">${msg} ${streak>1?'🔥 '+streak+' day streak':''}</div>
+      <div class="done-sub">Reviewed ${total} cards</div>
+      <div class="done-grid">
+        <div class="done-cell"><div class="dn red">${again}</div><div class="dl">Again</div></div>
+        <div class="done-cell"><div class="dn orange">${hard}</div><div class="dl">Hard</div></div>
+        <div class="done-cell"><div class="dn green">${good}</div><div class="dl">Good</div></div>
+        <div class="done-cell"><div class="dn blue">${easy}</div><div class="dl">Easy</div></div>
+      </div>
+      <div class="done-btns">
+        ${tot2.due+tot2.new>0?`<button class="done-btn" onclick="startReview(activeCat)">Continue (${tot2.due+tot2.new})</button>`:''}
+        <button class="done-btn sec" onclick="goHome()">← Home</button>
+      </div>
+    </div>`;
+}
+
+loadCards();
+</script>
+</body>
+</html>
